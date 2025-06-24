@@ -14,7 +14,7 @@ The paper explores stock price forecasting using LSTM neural networks. We incorp
 
 ## Paper PDF
 You can find the full publication [here (IEEE)](https://ieeexplore.ieee.org/document/10627125)  
-Or open `paper.pdf` in this repo.
+Or open `research paper.pdf` in this repo.
 
 ##  Authors
 - Sravan Sikhakolli  
