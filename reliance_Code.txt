@@ -1,0 +1,192 @@
+#importing the data
+import pandas as pd
+stock_data = pd.read_csv(&#39;./RelianceI.csv&#39;,index_col=&#39;Date&#39;)
+stock_data.head()
+
+#LSTM MODEL
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from keras.models import Sequential
+from keras.layers import Dense, LSTM
+from sklearn.metrics import mean_squared_error
+from sklearn.preprocessing import MinMaxScaler
+
+# Read the data
+stock_data = pd.read_csv(&#39;./RelianceI.csv&#39;, index_col=&#39;Date&#39;)
+
+# Extract the required columns
+selected_columns = [&#39;Close&#39;, &#39;PE Ratio&#39;, &#39;PB Ratio&#39;, &#39;PS Ratio&#39;]
+stock_data = stock_data[selected_columns]
+
+# Get the closing prices, PE, PB, and PS ratios
+X = stock_data.values
+
+# Split the data into train and test
+train_split = 0.8
+split_idx = int(np.ceil(len(X) * train_split))
+train = X[:split_idx]
+test = X[split_idx:]
+
+# Scale the data
+scaler = MinMaxScaler(feature_range=(0, 1))
+train_scaled = scaler.fit_transform(train)
+test_scaled = scaler.transform(test)
+
+# Scale the closing prices separately
+closing_price_scaler = MinMaxScaler(feature_range=(0, 1))
+closing_price_scaler.fit_transform(X[:, 0].reshape(-1, 1))
+
+# Reshape the data to LSTM input shape
+def create_dataset(X, lookback=1):
+X_data, y_data = [], []
+for i in range(len(X) - lookback):
+X_data.append(X[i:(i + lookback), :])
+y_data.append(X[i + lookback, 0])
+return np.array(X_data), np.array(y_data)
+
+lookback = 1
+X_train, y_train = create_dataset(train_scaled, lookback)
+X_test, y_test = create_dataset(test_scaled, lookback)
+
+# Create the LSTM model
+#Creating the LSTM Model: The Sequential model from Keras is initialized, and an LSTM
+layer with 50 units and a ReLU activation function is added. A dense layer with one unit
+is added for the output. The model is compiled with the Adam optimizer and mean
+squared error (MSE) loss function.
+model = Sequential()
+model.add(LSTM(50, activation=&#39;relu&#39;, input_shape=(lookback, X.shape[1])))
+model.add(Dense(1))
+model.compile(optimizer=&#39;adam&#39;, loss=&#39;mse&#39;)
+
+# Train the model
+model.fit(X_train, y_train, epochs=100, batch_size=32)
+
+# Generate predictions
+y_pred = model.predict(X_test)
+
+# Inverse transform the predictions and target to original scale
+y_pred_inv = closing_price_scaler.inverse_transform(y_pred)
+y_test_inv = closing_price_scaler.inverse_transform(y_test.reshape(-1, 1))
+
+# Print the evaluation metrics
+rmse = mean_squared_error(y_test_inv, y_pred_inv, squared=False)
+mape = mean_absolute_percentage_error(y_test_inv, y_pred_inv)
+print(&#39;Test RMSE: %.3f&#39; % rmse)
+print(&#39;Test MAPE: %.3f&#39; % mape)
+
+# Plot the actual and predicted values
+plt.figure(figsize=(10, 5))
+plt.plot(y_test_inv, label=&#39;Actual&#39;)
+plt.plot(y_pred_inv, label=&#39;Predicted&#39;)
+plt.legend()
+plt.show()
+print(y_pred_inv)
+#For Next day price prediction
+# Load the latest day&#39;s data
+latest_data = stock_data.tail(lookback+1)
+# Scale the latest day&#39;s data
+latest_data_scaled = scaler.transform(latest_data[[&#39;Close&#39;]])
+# Reshape the data to LSTM input shape
+X_latest = latest_data_scaled[:-1].reshape(1, lookback, 1)
+# Predict the next day&#39;s stock price
+y_latest_pred = model.predict(X_latest)
+# Inverse transform the prediction to original scale
+y_latest_pred_inv = scaler.inverse_transform(y_latest_pred.reshape(-1, 1))
+# Print the predicted stock price
+print(&#39;Predicted stock price for the next day:&#39;, y_latest_pred_inv[0][0])
+
+#Increase or decrease
+# Import necessary libraries
+import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense
+# Load the stock data
+stock_data = pd.read_csv(&#39;RelianceI.csv&#39;)
+# Add a column to represent the change in stock price from the previous day
+stock_data[&#39;Change&#39;] = stock_data[&#39;Close&#39;].diff()
+# Create a binary column to represent whether the stock price increased or decreased
+stock_data[&#39;Direction&#39;] = stock_data[&#39;Change&#39;].apply(lambda x: 1 if x &gt; 0 else 0)
+# Define the lookback period
+lookback = 30
+# Scale the data using MinMaxScaler
+scaler = MinMaxScaler()
+scaled_data = scaler.fit_transform(stock_data[[&#39;Close&#39;, &#39;Volume&#39;]])
+# Create the LSTM input sequences
+X = []
+y = []
+for i in range(lookback, len(scaled_data)):
+X.append(scaled_data[i-lookback:i])
+y.append(stock_data.iloc[i][&#39;Direction&#39;])
+X = np.array(X)
+y = np.array(y)
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
+# Define the LSTM model
+model = Sequential()
+model.add(LSTM(64, input_shape=(X_train.shape[1], X_train.shape[2])))
+model.add(Dense(1, activation=&#39;sigmoid&#39;))
+# Compile the model
+
+model.compile(loss=&#39;binary_crossentropy&#39;, optimizer=&#39;adam&#39;, metrics=[&#39;accuracy&#39;])
+# Train the model on the training set
+model.fit(X_train, y_train, epochs=10, validation_data=(X_test, y_test))
+# Predict the next day&#39;s stock price direction
+latest_data = stock_data.tail(lookback+1)
+latest_data_scaled = scaler.transform(latest_data[[&#39;Close&#39;, &#39;Volume&#39;]])
+X_latest = latest_data_scaled[:-1].reshape(1, lookback, 2)
+y_latest_pred = model.predict(X_latest)
+if y_latest_pred &gt; 0.5:
+print(&#39;Next day\&#39;s stock price for Relaince is predicted to increase.&#39;)
+else:
+print(&#39;Next day\&#39;s stock price for Relaince is predicted to decrease.&#39;)
+#Plotting Graphs
+import matplotlib.pyplot as plt
+# Sample actual and predicted values
+# Sample actual and predicted values
+actual_values =
+[3241.65,3188.85,3139.5,3130.75,3089.6,3104.8,3160.85,3174.8,3176,3198.15,3187.95,3219.2
+5,3219.4,3179.9,3220.7,3230.7,3283.25,3286.8,3282.15,3274.3,3255.05,3258.15,3208.7,3199.
+85,3222.85,3298.7,3297.05,3303.35,3293.5,3328.9]
+predicted_values =
+[3249.2,3198.2,3128.65,3128.56,3095.23,3111.23,3174.56,3195.8,3206.3,3212.3,3192.32,3202
+.33,3221.5,3278.76,3225.6,3240.5,3271.2,3271.2,3270.2,3264.52,3239.4,3198.25,3200,3198.6
+3,3227.05,3230.52,3310.01,3315.3,3289.25,3321.16]
+# Calculate gradients in percentage for actual values
+actual_gradients = [(actual_values[i+1] - actual_values[i]) / actual_values[i] * 100 for i in
+range(len(actual_values)-1)]
+# Calculate gradients in percentage for predicted values
+predicted_gradients = [(predicted_values[i+1] - predicted_values[i]) / predicted_values[i] * 100
+for i in range(len(predicted_values)-1)]
+# Create x-axis values for gradients
+x_gradients = range(len(actual_gradients))
+# Create x-axis values for actual and predicted values
+x_values = range(len(actual_values))
+
+# Create a new figure (Fig. 2)
+fig = plt.figure(figsize=(6, 9))
+# Part (a) - Actual vs Predicted Values
+ax1 = fig.add_subplot(2, 1, 1)
+ax1.plot(x_values, actual_values, label=&#39;Actual&#39;)
+ax1.plot(x_values, predicted_values, label=&#39;Predicted&#39;)
+ax1.set_xlabel(&#39;Days&#39;)
+ax1.set_ylabel(&#39;Value&#39;)
+ax1.set_title(&#39;Fig. 3a: Actual vs Predicted Values&#39;)
+ax1.legend(loc=&#39;upper left&#39;)
+# Part (b) - Actual and Predicted Gradients in Percentage
+ax2 = fig.add_subplot(2, 1, 2)
+ax2.plot(x_gradients, actual_gradients, &#39;r-&#39;, label=&#39;Actual Gradients (%)&#39;)
+ax2.plot(x_gradients, predicted_gradients, &#39;g-&#39;, label=&#39;Predicted Gradients (%)&#39;)
+ax2.axhline(y=0, color=&#39;black&#39;, linestyle=&#39;-&#39;, linewidth=0.5)
+ax2.set_xlabel(&#39;Days&#39;)
+ax2.set_ylabel(&#39;Gradient (%)&#39;)
+ax2.set_title(&#39;Fig. 3b: Actual and Predicted Gradients in Percentage&#39;)
+ax2.legend(loc=&#39;lower right&#39;)
+# Adjust spacing between subplots
+fig.tight_layout()
+# Display the plot
+plt.show()
